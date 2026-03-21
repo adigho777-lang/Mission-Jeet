@@ -22,10 +22,12 @@ export default function VideoPlayer({ videoUrl, videoId, courseId, userId }) {
   const hlsRef    = useRef(null);
   const saveTimer = useRef(null);
 
-  const [speed,     setSpeed]     = useState(1);
-  const [noteText,  setNoteText]  = useState('');
-  const [notes,     setNotes]     = useState([]);
-  const [showNotes, setShowNotes] = useState(false);
+  const [speed,      setSpeed]      = useState(1);
+  const [noteText,   setNoteText]   = useState('');
+  const [notes,      setNotes]      = useState([]);
+  const [showNotes,  setShowNotes]  = useState(false);
+  const [levels,     setLevels]     = useState([]);   // HLS quality levels
+  const [currentLvl, setCurrentLvl] = useState(-1);  // -1 = Auto
 
   const type = getVideoType(videoUrl);
 
@@ -37,10 +39,28 @@ export default function VideoPlayer({ videoUrl, videoId, courseId, userId }) {
     const vid = videoRef.current;
 
     if (type === 'hls' && Hls.isSupported()) {
-      const hls = new Hls({ maxBufferLength: 30, enableWorker: true });
+      const hls = new Hls({ maxBufferLength: 30, enableWorker: true, startLevel: -1 });
       hls.loadSource(videoUrl);
       hls.attachMedia(vid);
       hlsRef.current = hls;
+
+      // Populate quality levels once manifest is parsed
+      hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+        const lvls = data.levels.map((l, i) => ({
+          index: i,
+          label: l.height ? `${l.height}p` : `Level ${i + 1}`,
+          bitrate: l.bitrate,
+        }));
+        // Sort highest quality first
+        lvls.sort((a, b) => b.bitrate - a.bitrate);
+        setLevels(lvls);
+        setCurrentLvl(-1); // start on Auto
+      });
+
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+        // keep UI in sync when auto-switches
+        if (hls.autoLevelEnabled) setCurrentLvl(-1);
+      });
     } else {
       vid.src = videoUrl;
     }
@@ -62,7 +82,20 @@ export default function VideoPlayer({ videoUrl, videoId, courseId, userId }) {
     };
   }, [videoUrl, videoId, userId, type]);
 
-  // ── Save progress every 10s (non-YouTube only) ──
+  // ── Quality change handler ──
+  function changeQuality(lvlIndex) {
+    setCurrentLvl(lvlIndex);
+    if (!hlsRef.current) return;
+    if (lvlIndex === -1) {
+      hlsRef.current.currentLevel    = -1;
+      hlsRef.current.autoLevelEnabled = true;
+    } else {
+      hlsRef.current.autoLevelEnabled = false;
+      hlsRef.current.currentLevel    = lvlIndex;
+    }
+  }
+
+  // ── Save progress every 10s ──
   useEffect(() => {
     if (!userId || !videoId || type === 'youtube') return;
     saveTimer.current = setInterval(() => {
@@ -86,7 +119,7 @@ export default function VideoPlayer({ videoUrl, videoId, courseId, userId }) {
       .catch(() => {});
   }, [userId, videoId]);
 
-  // ── Speed (non-YouTube) ──
+  // ── Speed ──
   useEffect(() => {
     if (videoRef.current && type !== 'youtube') videoRef.current.playbackRate = speed;
   }, [speed, type]);
@@ -115,7 +148,7 @@ export default function VideoPlayer({ videoUrl, videoId, courseId, userId }) {
   return (
     <div className="w-full bg-black flex flex-col h-full">
 
-      {/* ── YouTube embed ── */}
+      {/* YouTube embed */}
       {type === 'youtube' && (
         <iframe
           src={`https://www.youtube.com/embed/${getYouTubeId(videoUrl)}?autoplay=1&rel=0`}
@@ -126,7 +159,7 @@ export default function VideoPlayer({ videoUrl, videoId, courseId, userId }) {
         />
       )}
 
-      {/* ── HLS / MP4 ── */}
+      {/* HLS / MP4 */}
       {type !== 'youtube' && (
         <video
           ref={videoRef}
@@ -139,7 +172,8 @@ export default function VideoPlayer({ videoUrl, videoId, courseId, userId }) {
 
       {/* Controls bar */}
       <div className="flex items-center gap-3 px-4 py-2 bg-gray-900 flex-wrap shrink-0">
-        {/* Speed — only for non-YouTube */}
+
+        {/* Speed — non-YouTube only */}
         {type !== 'youtube' && (
           <div className="flex items-center gap-1.5">
             <span className="text-gray-400 text-[11px]">Speed</span>
@@ -155,9 +189,26 @@ export default function VideoPlayer({ videoUrl, videoId, courseId, userId }) {
           </div>
         )}
 
-        {/* Video type badge */}
+        {/* Quality — HLS only */}
+        {type === 'hls' && levels.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-gray-400 text-[11px]">Quality</span>
+            <select
+              value={currentLvl}
+              onChange={(e) => changeQuality(Number(e.target.value))}
+              className="bg-gray-800 text-white text-[11px] rounded px-2 py-1 border border-gray-700 focus:outline-none"
+            >
+              <option value={-1}>Auto</option>
+              {levels.map((l) => (
+                <option key={l.index} value={l.index}>{l.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Type badge */}
         <span className="text-[10px] text-gray-500 uppercase font-mono">
-          {type === 'youtube' ? '\uD83D\uDCFA YouTube' : type === 'hls' ? '\uD83D\uDCF6 HLS' : '\uD83C\uDFA5 MP4'}
+          {type === 'youtube' ? '\uD83D\uDCFA YT' : type === 'hls' ? '\uD83D\uDCF6 HLS' : '\uD83C\uDFA5 MP4'}
         </span>
 
         {/* Notes toggle */}
