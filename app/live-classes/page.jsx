@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { scheduleNotifications, requestNotificationPermission } from '@/lib/notifications';
 
 export default function LiveClassesPage() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [classes,  setClasses]  = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [tab,      setTab]      = useState('all');   // all | jee | neet

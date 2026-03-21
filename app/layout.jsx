@@ -2,6 +2,7 @@ import './globals.css';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import TelegramPopup from './components/TelegramPopup';
+import NotificationInit from './components/NotificationInit';
 import { AuthProvider } from '@/lib/AuthContext';
 
 export const metadata = {
@@ -25,6 +26,7 @@ export default function RootLayout({ children }) {
             <Footer />
           </div>
           <TelegramPopup />
+          <NotificationInit />
         </AuthProvider>
       </body>
     </html>
