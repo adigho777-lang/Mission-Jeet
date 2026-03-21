@@ -12,6 +12,11 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="icon" href="/mission-jeet.jpg" type="image/jpeg" />
+        <link rel="shortcut icon" href="/mission-jeet.jpg" type="image/jpeg" />
+        <link rel="apple-touch-icon" href="/mission-jeet.jpg" />
+      </head>
       <body className="bg-white antialiased" suppressHydrationWarning>
         <AuthProvider>
           <Navbar />
