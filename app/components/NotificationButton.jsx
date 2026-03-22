@@ -86,13 +86,31 @@ export default function NotificationButton() {
       // Step 5: Get token - try with VAPID key first, then without
       setLog(p => p + '\n5. Getting FCM token...');
       let token = null;
+      
+      // First manually create push subscription to verify push works
+      setLog(p => p + '\n5a. Testing push subscription...');
+      try {
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: VAPID_KEY,
+        });
+        setLog(p => p + ' OK, endpoint: ' + sub.endpoint.substring(0, 40) + '...');
+        // Unsubscribe - Firebase will create its own
+        await sub.unsubscribe();
+        setLog(p => p + ' unsubscribed');
+      } catch(subErr) {
+        setLog(p => p + ' FAILED: ' + subErr.message);
+        throw new Error('Push subscription failed: ' + subErr.message);
+      }
+
+      setLog(p => p + '\n5b. Getting Firebase token...');
       try {
         token = await getToken(messaging, {
           vapidKey: VAPID_KEY,
           serviceWorkerRegistration: reg,
         });
       } catch (e1) {
-        setLog(p => p + ' (vapid failed: ' + e1.message.substring(0, 30) + ', trying without...)');
+        setLog(p => p + ' vapid-err: ' + e1.message.substring(0, 40));
         try {
           token = await getToken(messaging, {
             serviceWorkerRegistration: reg,
