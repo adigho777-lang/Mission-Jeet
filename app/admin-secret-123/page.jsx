@@ -446,18 +446,45 @@ function NotificationsTab() {
 
       // Send to each token
       let sent = 0;
+      let failed = 0;
+      const errors = [];
+      
       for (const token of tokens) {
         try {
-          await fetch('/api/send-notification', {
+          const res = await fetch('/api/send-notification', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ fcmToken: token, title, body }),
           });
-          sent++;
-        } catch {}
+          
+          const data = await res.json();
+          
+          if (data.success) {
+            sent++;
+          } else {
+            failed++;
+            if (data.error && !errors.includes(data.error)) {
+              errors.push(data.error);
+            }
+          }
+        } catch (e) {
+          failed++;
+          console.error('Error sending to token:', e);
+        }
       }
 
-      setResult({ success: true, message: `Sent to ${sent}/${tokens.length} users` });
+      if (sent > 0) {
+        setResult({ 
+          success: true, 
+          message: `✅ Sent to ${sent}/${tokens.length} users${failed > 0 ? `. ${failed} failed.` : ''}${errors.length > 0 ? ` Errors: ${errors.join(', ')}` : ''}` 
+        });
+      } else {
+        setResult({ 
+          success: false, 
+          message: `❌ Failed to send notifications. ${errors.length > 0 ? `Error: ${errors[0]}` : 'Check console for details.'}` 
+        });
+      }
+      
       setTitle('');
       setBody('');
     } catch (e) {
