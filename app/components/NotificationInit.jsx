@@ -2,32 +2,46 @@
 
 import { useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { requestFCMToken, onForegroundMessage } from '@/lib/fcm';
+import { getMessaging, getToken } from 'firebase/messaging';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { onForegroundMessage } from '@/lib/fcm';
 
+const VAPID_KEY = 'BNm5Q99AoKtUfqGdGyH-NNJq-_N4ml3vkNousW0FbY2yntvHlxkuFcBtZsvDbLYxfPvSquPWpADdIlkGQnGnOEQ';
+
+// Auto-refreshes FCM token on every login if permission already granted
 export default function NotificationInit() {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user) return;
-    if (typeof window === 'undefined') return;
-    if (!('Notification' in window)) return;
-
-    // Only auto-init if permission already granted
+    if (!user || typeof window === 'undefined') return;
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
     if (Notification.permission !== 'granted') return;
 
     const timer = setTimeout(async () => {
       try {
-        // Always refresh token on login to ensure it's valid
-        const token = await requestFCMToken(user.uid);
+        const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        await navigator.serviceWorker.ready;
+
+        const { app } = await import('@/lib/firebase');
+        const messaging = getMessaging(app);
+
+        let token = null;
+        try {
+          token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+        } catch (_) {
+          token = await getToken(messaging, { serviceWorkerRegistration: reg });
+        }
+
         if (token) {
-          console.log('Push notifications active');
+          await setDoc(doc(db, 'users', user.uid), { fcmToken: token }, { merge: true });
+          console.log('FCM token refreshed');
         }
 
         // Listen for foreground messages
-        const unsub = onForegroundMessage(() => {});
-        return () => unsub?.();
+        onForegroundMessage(() => {});
       } catch (e) {
-        console.error('Notification init error:', e);
+        console.error('FCM auto-init error:', e);
       }
     }, 2000);
 
