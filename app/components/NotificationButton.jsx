@@ -6,7 +6,7 @@ import { getMessaging, getToken } from 'firebase/messaging';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-const VAPID_KEY = 'BD_JNLh7jbNDSQNeUNE5YHDiCMpEwfSZ8PAQr6Yq1mKmt0iqm1hi5QuEIaAJJWbhEr3gy2DF7Tfnoirre9_Gj6g';
+const VAPID_KEY = 'BNm5Q99AoKtUfqGdGyH-NNJq-_N4ml3vkNousW0FbY2yntvHlxkuFcBtZsvDbLYxfPvSquPWpADdIlkGQnGnOEQ';
 
 export default function NotificationButton() {
   const { user } = useAuth();
@@ -39,6 +39,16 @@ export default function NotificationButton() {
       setLog(p => p + '\n2. Waiting for SW ready...');
       await navigator.serviceWorker.ready;
       setLog(p => p + ' OK');
+
+      // Step 2b: Clear old push subscription (fixes "push service error")
+      setLog(p => p + '\n2b. Clearing old push subscription...');
+      const existingSub = await reg.pushManager.getSubscription();
+      if (existingSub) {
+        await existingSub.unsubscribe();
+        setLog(p => p + ' cleared');
+      } else {
+        setLog(p => p + ' none');
+      }
 
       // Step 3: Permission
       setLog(p => p + '\n3. Requesting permission...');
