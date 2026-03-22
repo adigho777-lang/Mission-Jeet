@@ -6,25 +6,18 @@ import { requestFCMToken } from '@/lib/fcm';
 
 export default function NotificationButton() {
   const { user } = useAuth();
-  const [status, setStatus] = useState('idle'); // idle, requesting, enabled, denied
-  const [showTooltip, setShowTooltip] = useState(false);
+  const [status, setStatus] = useState('idle');
 
   useEffect(() => {
-    if (!user) return;
-    
-    // Check if already enabled
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'granted') {
-        setStatus('enabled');
-      } else if (Notification.permission === 'denied') {
-        setStatus('denied');
-      }
-    }
+    if (!user || typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission === 'granted') setStatus('enabled');
+    else if (Notification.permission === 'denied') setStatus('denied');
   }, [user]);
 
-  async function enableNotifications() {
-    if (!user) {
-      alert('Please login first');
+  async function handleClick() {
+    if (!user) return;
+    if (status === 'denied') {
+      alert('Notifications are blocked. Go to browser settings → Site settings → Notifications → Allow for this site.');
       return;
     }
 
@@ -33,41 +26,33 @@ export default function NotificationButton() {
       const token = await requestFCMToken(user.uid);
       if (token) {
         setStatus('enabled');
-        alert('✅ Notifications enabled! You will receive updates even when browser is closed.');
+        alert('Notifications enabled!');
       } else {
-        setStatus('denied');
-        alert('❌ Notification permission denied. Please enable in browser settings.');
+        setStatus('idle');
+        alert('Could not enable notifications. Check browser console for details.');
       }
     } catch (e) {
-      console.error('Error enabling notifications:', e);
+      console.error('Notification error:', e);
       setStatus('idle');
-      alert('Error enabling notifications. Check console for details.');
     }
   }
 
   if (!user) return null;
 
+  const colors = {
+    enabled: 'text-green-400',
+    denied: 'text-red-400',
+    requesting: 'text-yellow-400',
+    idle: 'text-gray-400 hover:text-white',
+  };
+
   return (
     <div className="relative">
       <button
-        onClick={enableNotifications}
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
-        disabled={status === 'requesting' || status === 'enabled'}
-        className={`p-2 rounded-lg transition-colors ${
-          status === 'enabled' 
-            ? 'text-green-400 hover:text-green-300' 
-            : status === 'denied'
-            ? 'text-red-400 hover:text-red-300'
-            : 'text-gray-400 hover:text-white'
-        }`}
-        title={
-          status === 'enabled' 
-            ? 'Notifications enabled' 
-            : status === 'denied'
-            ? 'Notifications blocked'
-            : 'Enable notifications'
-        }
+        onClick={handleClick}
+        disabled={status === 'requesting'}
+        className={`p-2 rounded-lg transition-colors ${colors[status]}`}
+        title={status === 'enabled' ? 'Notifications ON (click to refresh)' : status === 'denied' ? 'Notifications blocked' : 'Enable notifications'}
       >
         {status === 'requesting' ? (
           <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -83,15 +68,6 @@ export default function NotificationButton() {
           <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-black" />
         )}
       </button>
-
-      {showTooltip && status !== 'enabled' && (
-        <div className="absolute top-full right-0 mt-2 w-48 bg-gray-900 text-white text-xs p-2 rounded-lg shadow-lg z-50">
-          {status === 'denied' 
-            ? 'Notifications blocked. Enable in browser settings.'
-            : 'Click to enable push notifications'
-          }
-        </div>
-      )}
     </div>
   );
 }
