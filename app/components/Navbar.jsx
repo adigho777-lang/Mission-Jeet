@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import NotificationButton from './NotificationButton';
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -81,6 +82,10 @@ export default function Navbar() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
+          
+          {/* Notification Bell */}
+          <NotificationButton />
+          
           {user ? (
             <div className="relative">
               <button
