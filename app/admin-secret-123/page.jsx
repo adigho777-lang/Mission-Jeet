@@ -57,6 +57,7 @@ export default function AdminPage() {
       <div className="max-w-[960px] mx-auto px-4 py-8">
         <h1 className="text-[20px] font-bold text-black mb-6">Admin Panel</h1>
 
+        {/* Tabs */}
         <div className="flex gap-2 mb-6 flex-wrap">
           {TABS.map((t) => (
             <button key={t} onClick={() => setTab(t)}
@@ -65,12 +66,21 @@ export default function AdminPage() {
               }`}
             >{t}</button>
           ))}
+          <button
+            onClick={() => setTab('notifications')}
+            className={`px-5 py-2 rounded-lg text-[13px] font-semibold transition-colors ${
+              tab === 'notifications' ? 'bg-black text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-black'
+            }`}
+          >
+            📢 Send Notification
+          </button>
         </div>
 
         {tab === 'classes' && <ClassesTab />}
         {tab === 'content' && <ContentTab />}
         {tab === 'users'   && <UsersTab />}
         {tab === 'stats'   && <StatsTab />}
+        {tab === 'notifications' && <NotificationsTab />}
       </div>
     </div>
   );
@@ -387,6 +397,90 @@ function StatsTab() {
           <p className="text-[12px] text-gray-500 mt-1">{s.label}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+
+// ── Notifications Tab ─────────────────────────────────────────────────────────
+function NotificationsTab() {
+  const [title,   setTitle]   = useState('');
+  const [body,    setBody]    = useState('');
+  const [sending, setSending] = useState(false);
+  const [result,  setResult]  = useState(null);
+
+  async function sendToAll() {
+    if (!title.trim() || !body.trim()) return;
+    setSending(true);
+    setResult(null);
+    try {
+      // Get all users with FCM tokens
+      const snap = await getDocs(collection(db, 'users'));
+      const tokens = snap.docs
+        .map((d) => d.data().fcmToken)
+        .filter((t) => t);
+
+      if (tokens.length === 0) {
+        setResult({ success: false, message: 'No users with FCM tokens found' });
+        return;
+      }
+
+      // Send to each token
+      let sent = 0;
+      for (const token of tokens) {
+        try {
+          await fetch('/api/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fcmToken: token, title, body }),
+          });
+          sent++;
+        } catch {}
+      }
+
+      setResult({ success: true, message: `Sent to ${sent}/${tokens.length} users` });
+      setTitle('');
+      setBody('');
+    } catch (e) {
+      setResult({ success: false, message: e.message });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5">
+      <h2 className="text-[14px] font-bold mb-4">📢 Send Push Notification to All Users</h2>
+      <p className="text-[12px] text-gray-500 mb-4">
+        Sends to all users who enabled push notifications (works even if browser is closed).
+      </p>
+      <div className="space-y-3">
+        <input
+          className={inp}
+          placeholder="Notification Title *"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <textarea
+          className={inp}
+          placeholder="Notification Body *"
+          rows={3}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+        />
+        <button
+          onClick={sendToAll}
+          disabled={sending || !title.trim() || !body.trim()}
+          className="bg-black text-white text-[13px] font-semibold px-6 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+        >
+          {sending ? 'Sending...' : 'Send to All Users'}
+        </button>
+        {result && (
+          <div className={`text-[12px] p-3 rounded-lg ${result.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+            {result.message}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
