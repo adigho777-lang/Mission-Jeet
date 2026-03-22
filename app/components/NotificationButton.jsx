@@ -42,12 +42,30 @@ export default function NotificationButton() {
 
       // Step 2b: Clear old push subscription (fixes "push service error")
       setLog(p => p + '\n2b. Clearing old push subscription...');
-      const existingSub = await reg.pushManager.getSubscription();
-      if (existingSub) {
-        await existingSub.unsubscribe();
-        setLog(p => p + ' cleared');
-      } else {
-        setLog(p => p + ' none');
+      try {
+        const existingSub = await reg.pushManager.getSubscription();
+        if (existingSub) {
+          await existingSub.unsubscribe();
+          setLog(p => p + ' cleared');
+        } else {
+          setLog(p => p + ' none');
+        }
+      } catch(e) {
+        setLog(p => p + ' skip(' + e.message.substring(0,20) + ')');
+      }
+
+      // Step 2c: Check push manager permission state
+      setLog(p => p + '\n2c. Push manager state...');
+      try {
+        const pushPerm = await reg.pushManager.permissionState({ userVisibleOnly: true });
+        setLog(p => p + ' ' + pushPerm);
+        if (pushPerm === 'denied') {
+          setStatus('denied');
+          alert('Push notifications are blocked at browser level. Go to browser site settings and allow notifications.');
+          return;
+        }
+      } catch(e) {
+        setLog(p => p + ' check-failed');
       }
 
       // Step 3: Permission
@@ -65,12 +83,24 @@ export default function NotificationButton() {
       const messaging = getMessaging(app);
       setLog(p => p + ' OK');
 
-      // Step 5: Get token
+      // Step 5: Get token - try with VAPID key first, then without
       setLog(p => p + '\n5. Getting FCM token...');
-      const token = await getToken(messaging, {
-        vapidKey: VAPID_KEY,
-        serviceWorkerRegistration: reg,
-      });
+      let token = null;
+      try {
+        token = await getToken(messaging, {
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: reg,
+        });
+      } catch (e1) {
+        setLog(p => p + ' (vapid failed: ' + e1.message.substring(0, 30) + ', trying without...)');
+        try {
+          token = await getToken(messaging, {
+            serviceWorkerRegistration: reg,
+          });
+        } catch (e2) {
+          throw e2;
+        }
+      }
       setLog(p => p + ' ' + (token ? 'GOT TOKEN' : 'NO TOKEN'));
 
       if (!token) {
