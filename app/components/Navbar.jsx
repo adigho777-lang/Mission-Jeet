@@ -159,6 +159,7 @@ export default function Navbar() {
               Login / Register
             </Link>
           )}
+          <NotificationButton mobile={true} />
         </div>
       )}
     </header>
