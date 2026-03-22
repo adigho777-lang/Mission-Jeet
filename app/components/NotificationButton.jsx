@@ -6,7 +6,7 @@ import { getMessaging, getToken } from 'firebase/messaging';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-const VAPID_KEY = 'BNm5Q99AoKtUfqGdGyH-NNJq-_N4ml3vkNousW0FbY2yntvHlxkuFcBtZsvDbLYxfPvSquPWpADdIlkGQnGnOEQ';
+const VAPID_KEY = 'BD_JNLh7jbNDSQNeUNE5YHDiCMpEwfSZ8PAQr6Yq1mKmt0iqm1hi5QuEIaAJJWbhEr3gy2DF7Tfnoirre9_Gj6g';
 
 export default function NotificationButton() {
   const { user } = useAuth();

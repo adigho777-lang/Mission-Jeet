@@ -1,4 +1,4 @@
-// Firebase Cloud Messaging Service Worker
+// Firebase Cloud Messaging Service Worker v2
 // This runs in background even when browser/tab is closed
 
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
