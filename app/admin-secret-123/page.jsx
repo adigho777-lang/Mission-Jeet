@@ -451,6 +451,8 @@ function NotificationsTab() {
       
       for (const token of tokens) {
         try {
+          console.log('📤 Sending to token:', token.substring(0, 20) + '...');
+          
           const res = await fetch('/api/send-notification', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -458,37 +460,49 @@ function NotificationsTab() {
           });
           
           const data = await res.json();
+          console.log('📥 Response:', data);
           
           if (data.success) {
             sent++;
+            console.log('✅ Sent successfully');
           } else {
             failed++;
+            console.error('❌ Failed:', data.error);
             if (data.error && !errors.includes(data.error)) {
               errors.push(data.error);
             }
           }
         } catch (e) {
           failed++;
-          console.error('Error sending to token:', e);
+          console.error('❌ Error sending to token:', e);
+          if (!errors.includes(e.message)) {
+            errors.push(e.message);
+          }
         }
       }
 
       if (sent > 0) {
         setResult({ 
           success: true, 
-          message: `✅ Sent to ${sent}/${tokens.length} users${failed > 0 ? `. ${failed} failed.` : ''}${errors.length > 0 ? ` Errors: ${errors.join(', ')}` : ''}` 
+          message: `✅ Sent to ${sent}/${tokens.length} users${failed > 0 ? `. ${failed} failed.` : ''}${errors.length > 0 ? `\n\nErrors: ${errors.join(', ')}` : ''}` 
         });
       } else {
         setResult({ 
           success: false, 
-          message: `❌ Failed to send notifications. ${errors.length > 0 ? `Error: ${errors[0]}` : 'Check console for details.'}` 
+          message: `❌ Failed to send all notifications.\n\n${errors.length > 0 ? `Error: ${errors[0]}` : 'Check browser console for details.'}` 
         });
+      }
+      
+      if (sent === 0) {
+        // Don't clear form if all failed
+        return;
       }
       
       setTitle('');
       setBody('');
     } catch (e) {
-      setResult({ success: false, message: e.message });
+      console.error('❌ Exception:', e);
+      setResult({ success: false, message: `Error: ${e.message}` });
     } finally {
       setSending(false);
     }
@@ -539,7 +553,7 @@ function NotificationsTab() {
         </button>
         {result && (
           <div className={`text-[12px] p-3 rounded-lg ${result.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-            {result.message}
+            <pre className="whitespace-pre-wrap font-sans">{result.message}</pre>
           </div>
         )}
       </div>
