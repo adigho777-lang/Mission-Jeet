@@ -408,6 +408,23 @@ function NotificationsTab() {
   const [body,    setBody]    = useState('');
   const [sending, setSending] = useState(false);
   const [result,  setResult]  = useState(null);
+  const [tokenCount, setTokenCount] = useState(null);
+
+  async function checkTokens() {
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      const tokens = snap.docs
+        .map((d) => ({ uid: d.id, token: d.data().fcmToken }))
+        .filter((t) => t.token);
+      
+      console.log('📊 Users with FCM tokens:', tokens);
+      setTokenCount(tokens.length);
+      setResult({ success: true, message: `Found ${tokens.length} users with FCM tokens` });
+    } catch (e) {
+      console.error('Error checking tokens:', e);
+      setResult({ success: false, message: e.message });
+    }
+  }
 
   async function sendToAll() {
     if (!title.trim() || !body.trim()) return;
@@ -420,8 +437,10 @@ function NotificationsTab() {
         .map((d) => d.data().fcmToken)
         .filter((t) => t);
 
+      console.log('📊 Found FCM tokens:', tokens.length);
+
       if (tokens.length === 0) {
-        setResult({ success: false, message: 'No users with FCM tokens found' });
+        setResult({ success: false, message: 'No users with FCM tokens found. Make sure users have logged in and allowed notifications.' });
         return;
       }
 
@@ -454,6 +473,22 @@ function NotificationsTab() {
       <p className="text-[12px] text-gray-500 mb-4">
         Sends to all users who enabled push notifications (works even if browser is closed).
       </p>
+      
+      {/* Debug: Check token count */}
+      <div className="mb-4 pb-4 border-b border-gray-200">
+        <button
+          onClick={checkTokens}
+          className="bg-blue-500 text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+        >
+          🔍 Check FCM Token Count
+        </button>
+        {tokenCount !== null && (
+          <p className="text-[12px] text-gray-600 mt-2">
+            Found {tokenCount} users with FCM tokens
+          </p>
+        )}
+      </div>
+
       <div className="space-y-3">
         <input
           className={inp}
