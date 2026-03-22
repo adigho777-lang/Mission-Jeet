@@ -142,14 +142,18 @@ export default function Navbar() {
           <Link href="/live-classes" className="text-white text-xs" onClick={() => setOpen(false)}>Live Classes</Link>
           <Link href="/leaderboard" className="text-white text-xs" onClick={() => setOpen(false)}>Leaderboard</Link>
           <Link href="#products" className="text-white text-xs" onClick={() => setOpen(false)}>Our Products</Link>
-          <Link
-            href="#"
-            className="text-xs font-semibold px-4 py-2 rounded text-center"
-            style={{ background: '#fff', color: '#111' }}
-            onClick={() => setOpen(false)}
-          >
-            Login / Register
-          </Link>
+          {user ? (
+            <button onClick={logout} className="text-white text-xs text-left">Sign out</button>
+          ) : (
+            <Link
+              href="/login"
+              className="text-xs font-semibold px-4 py-2 rounded text-center"
+              style={{ background: '#fff', color: '#111' }}
+              onClick={() => setOpen(false)}
+            >
+              Login / Register
+            </Link>
+          )}
         </div>
       )}
     </header>
