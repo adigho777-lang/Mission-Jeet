@@ -6,12 +6,8 @@
   "regions": ["bom1"],
   "crons": [
     {
-      "path": "/api/schedule-notifications",
-      "schedule": "* * * * *"
-    },
-    {
       "path": "/api/sync-data",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }

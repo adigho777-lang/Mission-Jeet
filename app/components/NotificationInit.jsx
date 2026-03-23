@@ -6,6 +6,7 @@ import { getMessaging, getToken } from 'firebase/messaging';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { onForegroundMessage } from '@/lib/fcm';
+import { startLiveClassNotifier, stopLiveClassNotifier } from '@/lib/liveClassNotifier';
 
 const VAPID_KEY = 'BNm5Q99AoKtUfqGdGyH-NNJq-_N4ml3vkNousW0FbY2yntvHlxkuFcBtZsvDbLYxfPvSquPWpADdIlkGQnGnOEQ';
 
@@ -40,12 +41,18 @@ export default function NotificationInit() {
 
         // Listen for foreground messages
         onForegroundMessage(() => {});
+
+        // Start live class notifier
+        startLiveClassNotifier({ uid: user.uid, profile: user.profile });
       } catch (e) {
         console.error('FCM auto-init error:', e);
       }
     }, 2000);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      stopLiveClassNotifier();
+    };
   }, [user]);
 
   return null;
