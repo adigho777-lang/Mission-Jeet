@@ -8,6 +8,10 @@
     {
       "path": "/api/schedule-notifications",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/sync-data",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

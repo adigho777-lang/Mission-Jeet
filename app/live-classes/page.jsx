@@ -31,6 +31,10 @@ export default function LiveClassesPage() {
       }
     }
     load();
+
+    // Auto-refresh every 30 seconds to update live status
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const now = Date.now();
