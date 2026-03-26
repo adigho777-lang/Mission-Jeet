@@ -4,16 +4,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 const fallbackCourses = [
-  {
-    id: '151',
-    title: 'Drona JEE class 11th',
-    thumbnail: 'https://dxixtlyravvxx.cloudfront.net/1772100600/admin_v2/thumbnails//2679626_131_drona%20jee%20banner%20website.jpg',
-  },
-  {
-    id: '152',
-    title: 'Drona NEET class 11th',
-    thumbnail: 'https://dxixtlyravvxx.cloudfront.net/1772100600/admin_v2/thumbnails//147818_131_drona%20neet%20banner%20website.jpg',
-  },
+  { id: '151', title: 'Drona JEE class 11th', thumbnail: '' },
+  { id: '152', title: 'Drona NEET class 11th', thumbnail: '' },
 ];
 
 export default function TrendingCourses() {
@@ -66,23 +58,16 @@ export default function TrendingCourses() {
 
                 {/* CARD */}
                 <div
-                  onClick={() =>
-                    setActiveId(isActive ? null : c.id)
-                  }
-                  className="relative rounded-xl overflow-hidden cursor-pointer transition hover:scale-[1.03]"
-                  style={{
-                    width: '160px',
-                    height: '100px',
-                    boxShadow: '0 1px 6px rgba(0,0,0,0.12)',
-                  }}
+                  onClick={() => setActiveId(isActive ? null : c.id)}
+                  className="relative rounded-xl overflow-hidden cursor-pointer transition hover:scale-[1.03] flex items-center justify-center bg-gray-900"
+                  style={{ width: '160px', height: '100px', boxShadow: '0 1px 6px rgba(0,0,0,0.12)' }}
                 >
-                  <Image
-                    src={c.thumbnail}
-                    alt={c.title}
-                    fill
-                    className="object-cover"
-                    sizes="160px"
-                  />
+                  {c.thumbnail ? (
+                    <Image src={c.thumbnail} alt={c.title} fill className="object-cover"
+                      sizes="160px" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                  ) : (
+                    <span className="text-3xl">📚</span>
+                  )}
                 </div>
 
                 {/* TITLE */}
