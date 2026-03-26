@@ -10,7 +10,6 @@ import { startLiveClassNotifier, stopLiveClassNotifier } from '@/lib/liveClassNo
 
 const VAPID_KEY = 'BNm5Q99AoKtUfqGdGyH-NNJq-_N4ml3vkNousW0FbY2yntvHlxkuFcBtZsvDbLYxfPvSquPWpADdIlkGQnGnOEQ';
 
-// Auto-refreshes FCM token on every login if permission already granted
 export default function NotificationInit() {
   const { user } = useAuth();
 
@@ -19,6 +18,10 @@ export default function NotificationInit() {
     if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
     if (Notification.permission !== 'granted') return;
 
+    // Always start live class notifier regardless of FCM
+    startLiveClassNotifier({ uid: user.uid, profile: user.profile });
+
+    // FCM token refresh — silently fails if push service unavailable (browser issue)
     const timer = setTimeout(async () => {
       try {
         const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
@@ -30,24 +33,21 @@ export default function NotificationInit() {
         let token = null;
         try {
           token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
-        } catch (_) {
-          token = await getToken(messaging, { serviceWorkerRegistration: reg });
+        } catch {
+          // Push service unavailable in this browser — skip silently
+          // User can still receive notifications when they manually click bell icon
+          return;
         }
 
         if (token) {
           await setDoc(doc(db, 'users', user.uid), { fcmToken: token }, { merge: true });
-          console.log('FCM token refreshed');
         }
 
-        // Listen for foreground messages
         onForegroundMessage(() => {});
-
-        // Start live class notifier
-        startLiveClassNotifier({ uid: user.uid, profile: user.profile });
-      } catch (e) {
-        console.error('FCM auto-init error:', e);
+      } catch {
+        // Silent fail — don't log push service errors to console
       }
-    }, 2000);
+    }, 3000);
 
     return () => {
       clearTimeout(timer);

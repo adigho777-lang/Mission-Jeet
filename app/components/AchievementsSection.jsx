@@ -1,5 +1,3 @@
-import Image from 'next/image';
-
 const stats = [
   { value: '20+',  label: 'Instructors', bg: '#fef9c3', border: '#fde68a', color: '#92400e', icon: '👨‍🏫' },
   { value: '20K+', label: 'Videos',      bg: '#e0f2fe', border: '#bae6fd', color: '#1d4ed8', icon: '🎥' },
@@ -14,13 +12,12 @@ export default function AchievementsSection() {
 
         {/* LEFT IMAGE */}
         <div className="flex justify-center md:justify-start">
-          <Image
+          <img
             src="https://missionjeet.in/images/Nexttopper_achivement.png"
             alt="Achievements"
-            width={480}
-            height={360}
-            style={{ width: '100%', height: 'auto' }}
-            className="object-contain max-w-[480px]"
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            style={{ width: '100%', height: 'auto', maxWidth: '480px' }}
+            className="object-contain"
           />
         </div>
 
