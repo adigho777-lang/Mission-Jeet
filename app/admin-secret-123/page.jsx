@@ -594,11 +594,14 @@ function ApiManagementTab() {
     if (!baseUrl.trim()) return;
     setTesting(true); setTestResult(null);
     try {
-      // Save first so proxy picks up the new URL, then test via proxy (avoids CORS)
+      // Save to Firestore first
       const { setDoc, doc: fsDoc } = await import('firebase/firestore');
       await setDoc(fsDoc(db, 'apiConfig', 'urls'), { baseUrl: baseUrl.trim() }, { merge: true });
 
-      // Test via our proxy — proxy reads baseUrl from Firestore
+      // Small delay to ensure Firestore write propagates
+      await new Promise(r => setTimeout(r, 500));
+
+      // Test via proxy (proxy reads baseUrl from Firestore, no CORS issue)
       const res = await fetch('/api/missionjeet/batches', { cache: 'no-store' });
       const data = await res.json();
       if (data.error) throw new Error(data.error);

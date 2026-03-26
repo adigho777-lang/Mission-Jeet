@@ -1,30 +1,19 @@
 import { NextResponse } from 'next/server';
 
-// Proxy route — reads base URL from Firestore via REST API (no SDK needed)
-// This avoids any Firebase SDK import issues in server routes
+// Proxy — reads base URL from Firestore REST API on every request (no cache)
 
-let _baseUrl = null;
-let _baseTime = 0;
+const PROJECT_ID = 'mission-jeet-8f2f5';
 
 async function getBaseUrl() {
-  if (_baseUrl && Date.now() - _baseTime < 60000) return _baseUrl;
-
   try {
-    // Use Firestore REST API directly — no SDK import needed
-    const projectId = 'mission-jeet-8f2f5';
-    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/apiConfig/urls`;
+    const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/apiConfig/urls`;
     const res = await fetch(url, { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
-      const baseUrl = data?.fields?.baseUrl?.stringValue;
-      if (baseUrl) {
-        _baseUrl  = baseUrl.replace(/\/$/, '');
-        _baseTime = Date.now();
-        return _baseUrl;
-      }
+      const base = data?.fields?.baseUrl?.stringValue;
+      if (base) return base.replace(/\/$/, '');
     }
   } catch {}
-
   return null;
 }
 
@@ -43,16 +32,16 @@ export async function GET(req, { params }) {
 
     const res = await fetch(url, {
       cache: 'no-store',
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(20000),
     });
 
     if (!res.ok) {
-      return NextResponse.json({ error: `Upstream ${res.status}` }, { status: res.status });
+      return NextResponse.json({ error: `Upstream ${res.status}: ${url}` }, { status: res.status });
     }
 
     const text = await res.text();
     if (!text?.trim()) {
-      return NextResponse.json({ error: 'Empty response' }, { status: 502 });
+      return NextResponse.json({ error: 'Empty response from upstream' }, { status: 502 });
     }
 
     let data;
