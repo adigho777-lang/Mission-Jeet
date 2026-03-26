@@ -66,21 +66,20 @@ export default function AdminPage() {
               }`}
             >{t}</button>
           ))}
-          <button
-            onClick={() => setTab('notifications')}
-            className={`px-5 py-2 rounded-lg text-[13px] font-semibold transition-colors ${
-              tab === 'notifications' ? 'bg-black text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-black'
-            }`}
-          >
-            📢 Send Notification
-          </button>
+          <button onClick={() => setTab('notifications')}
+            className={`px-5 py-2 rounded-lg text-[13px] font-semibold transition-colors ${tab === 'notifications' ? 'bg-black text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-black'}`}
+          >📢 Notifications</button>
+          <button onClick={() => setTab('apis')}
+            className={`px-5 py-2 rounded-lg text-[13px] font-semibold transition-colors ${tab === 'apis' ? 'bg-black text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-black'}`}
+          >🔌 API Management</button>
         </div>
 
-        {tab === 'classes' && <ClassesTab />}
-        {tab === 'content' && <ContentTab />}
-        {tab === 'users'   && <UsersTab />}
-        {tab === 'stats'   && <StatsTab />}
+        {tab === 'classes'       && <ClassesTab />}
+        {tab === 'content'       && <ContentTab />}
+        {tab === 'users'         && <UsersTab />}
+        {tab === 'stats'         && <StatsTab />}
         {tab === 'notifications' && <NotificationsTab />}
+        {tab === 'apis'          && <ApiManagementTab />}
       </div>
     </div>
   );
@@ -556,6 +555,204 @@ function NotificationsTab() {
             <pre className="whitespace-pre-wrap font-sans">{result.message}</pre>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+
+// ── API Management Tab ────────────────────────────────────────────────────────
+function ApiManagementTab() {
+  const DEFAULT_APIS = {
+    baseUrl:        'https://apiserverpro.onrender.com/api/missionjeet',
+    batches:        'https://apiserverpro.onrender.com/api/missionjeet/batches',
+    courseDetails:  'https://apiserverpro.onrender.com/api/missionjeet/course-details',
+    allContent:     'https://apiserverpro.onrender.com/api/missionjeet/all-content',
+    contentDetails: 'https://apiserverpro.onrender.com/api/missionjeet/content-details',
+  };
+
+  const API_LABELS = {
+    baseUrl:        'Base URL (proxy uses this)',
+    batches:        'Batches API (course list)',
+    courseDetails:  'Course Details API',
+    allContent:     'All Content API (videos/folders)',
+    contentDetails: 'Content Details API (video URL)',
+  };
+
+  const [config, setConfig]   = useState(DEFAULT_APIS);
+  const [saved,  setSaved]    = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+  const [testResults, setTestResults] = useState({});
+
+  useEffect(() => {
+    getDocs(collection(db, 'apiConfig')).then(snap => {
+      const d = snap.docs.find(d => d.id === 'urls');
+      if (d) setConfig(prev => ({ ...prev, ...d.data() }));
+    });
+  }, []);
+
+  async function handleSave() {
+    setSaving(true);
+    setSaved(false);
+    try {
+      const { setDoc, doc: fsDoc } = await import('firebase/firestore');
+      await setDoc(fsDoc(db, 'apiConfig', 'urls'), config, { merge: true });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      alert('Save failed: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleTest(key) {
+    const url = config[key];
+    if (!url) return;
+    setTestResults(p => ({ ...p, [key]: 'testing...' }));
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      const data = await res.json();
+      const count = Array.isArray(data) ? data.length : Array.isArray(data?.data) ? data.data.length : '?';
+      setTestResults(p => ({ ...p, [key]: `✅ OK — ${count} items (${res.status})` }));
+    } catch (e) {
+      setTestResults(p => ({ ...p, [key]: `❌ Failed: ${e.message}` }));
+    }
+  }
+
+  async function handleSync(type) {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch('/api/admin-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type }),
+      });
+      const data = await res.json();
+      setSyncResult(data);
+    } catch (e) {
+      setSyncResult({ error: e.message });
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleReset() {
+    if (!confirm('Reset all APIs to default?')) return;
+    setConfig(DEFAULT_APIS);
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* API URLs */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[14px] font-bold">🔌 API Configuration</h2>
+          <button onClick={handleReset} className="text-[11px] text-gray-400 hover:text-red-500 transition-colors">
+            Reset to defaults
+          </button>
+        </div>
+        <p className="text-[12px] text-gray-500 mb-4">
+          Change any API URL here. Website will automatically use the new URL. No code changes needed.
+        </p>
+
+        <div className="space-y-4">
+          {Object.keys(DEFAULT_APIS).map(key => (
+            <div key={key}>
+              <label className="block text-[12px] font-semibold text-gray-700 mb-1">
+                {API_LABELS[key] || key}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  className={inp + ' flex-1 font-mono text-[11px]'}
+                  value={config[key] || ''}
+                  onChange={e => setConfig(p => ({ ...p, [key]: e.target.value }))}
+                  placeholder={DEFAULT_APIS[key]}
+                />
+                <button
+                  onClick={() => handleTest(key)}
+                  className="shrink-0 px-3 py-2 text-[11px] border border-gray-200 rounded-lg hover:border-black transition-colors"
+                >
+                  Test
+                </button>
+              </div>
+              {testResults[key] && (
+                <p className={`text-[11px] mt-1 ${testResults[key].startsWith('✅') ? 'text-green-600' : testResults[key] === 'testing...' ? 'text-gray-400' : 'text-red-500'}`}>
+                  {testResults[key]}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-3 mt-5">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-black text-white text-[13px] font-semibold px-6 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+          >
+            {saving ? 'Saving...' : saved ? '✅ Saved!' : 'Save API Config'}
+          </button>
+        </div>
+      </div>
+
+      {/* Sync Controls */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <h2 className="text-[14px] font-bold mb-2">🔄 Data Sync</h2>
+        <p className="text-[12px] text-gray-500 mb-4">
+          Manually trigger a sync to fetch latest data from APIs and update Firebase. Website always reads from Firebase.
+        </p>
+
+        <div className="flex gap-3 flex-wrap">
+          <button
+            onClick={() => handleSync('batches')}
+            disabled={syncing}
+            className="bg-blue-500 text-white text-[13px] font-semibold px-5 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
+          >
+            {syncing ? 'Syncing...' : '🔄 Sync Batches → Firebase'}
+          </button>
+          <button
+            onClick={() => handleSync('all')}
+            disabled={syncing}
+            className="bg-purple-500 text-white text-[13px] font-semibold px-5 py-2 rounded-lg hover:bg-purple-600 disabled:opacity-50 transition-colors"
+          >
+            {syncing ? 'Syncing...' : '🔄 Sync All → Firebase'}
+          </button>
+        </div>
+
+        {syncResult && (
+          <div className={`mt-4 p-3 rounded-lg text-[12px] ${syncResult.error ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>
+            {syncResult.error ? (
+              <p>❌ {syncResult.error}</p>
+            ) : (
+              <div>
+                <p className="font-semibold mb-1">✅ Sync complete!</p>
+                {syncResult.results?.batches && (
+                  <p>Batches: {syncResult.results.batches.total} total, {syncResult.results.batches.updated} updated, {syncResult.results.batches.added} added</p>
+                )}
+                {syncResult.results?.batches?.note && (
+                  <p className="text-yellow-600 mt-1">⚠️ {syncResult.results.batches.note}</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* How it works */}
+      <div className="bg-blue-50 border border-blue-100 rounded-xl p-5">
+        <h3 className="text-[13px] font-bold text-blue-800 mb-2">ℹ️ How it works</h3>
+        <ul className="text-[12px] text-blue-700 space-y-1">
+          <li>• Website reads all data from <strong>Firebase</strong> (not directly from APIs)</li>
+          <li>• When you change an API URL and click Save, the new URL is stored in Firebase</li>
+          <li>• Click "Sync Batches → Firebase" to fetch from new API and update Firebase</li>
+          <li>• Website automatically shows updated data</li>
+          <li>• Daily auto-sync runs at midnight (Vercel cron)</li>
+          <li>• You can change any API anytime without touching code</li>
+        </ul>
       </div>
     </div>
   );

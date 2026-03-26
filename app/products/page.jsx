@@ -26,6 +26,20 @@ function ProductsContent() {
       setLoading(true);
       setError(null);
       try {
+        // Read from Firebase first (API → Firebase → Website)
+        const { collection, getDocs } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        const snap = await getDocs(collection(db, 'courses'));
+        
+        if (!snap.empty) {
+          // Firebase has data — use it
+          const firebaseBatches = snap.docs.map(d => d.data());
+          setBatches(firebaseBatches);
+          setLoading(false);
+          return;
+        }
+
+        // Firebase empty — fallback to API
         const res  = await fetch('/api/missionjeet/batches');
         if (!res.ok) throw new Error(`API error: ${res.status}`);
         const json = await res.json();
