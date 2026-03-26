@@ -23,41 +23,17 @@ export default function TrendingCourses() {
   useEffect(() => {
     async function load() {
       try {
-        // Try Firebase first
+        // ONLY Firebase — no direct API calls
         const { collection, getDocs } = await import('firebase/firestore');
         const { db } = await import('@/lib/firebase');
         const snap = await getDocs(collection(db, 'batches'));
-
-        if (!snap.empty) {
-          const list = snap.docs.map(d => d.data()).filter(c => c.thumbnail);
-          if (list.length >= 1) {
-            setCourses(list.slice(0, 2).map(c => ({
-              id: c.id,
-              title: c.title,
-              thumbnail: c.thumbnail,
-            })));
-            return;
-          }
+        const list = snap.docs.map(d => d.data()).filter(c => c.thumbnail);
+        if (list.length >= 1) {
+          setCourses(list.slice(0, 2).map(c => ({
+            id: c.id, title: c.title, thumbnail: c.thumbnail,
+          })));
         }
       } catch {}
-
-      // Fallback: API
-      fetch('/api/missionjeet/batches')
-        .then((r) => r.json())
-        .then((json) => {
-          const raw = Array.isArray(json) ? json : json?.data ?? [];
-          const list = raw
-            .flatMap((item) => Array.isArray(item?.list) ? item.list : [item])
-            .filter((c) => c?.thumbnail || c?.image);
-          if (list.length >= 1) {
-            setCourses(list.slice(0, 2).map((c) => ({
-              id: c.id || c._id,
-              title: c.title || c.name,
-              thumbnail: c.thumbnail || c.image,
-            })));
-          }
-        })
-        .catch(() => {});
     }
     load();
   }, []);

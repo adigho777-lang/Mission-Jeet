@@ -26,36 +26,15 @@ function ProductsContent() {
       setLoading(true);
       setError(null);
       try {
-        // Read from Firebase first (API → Firebase → Website)
+        // ONLY Firebase — no direct API calls
         const { collection, getDocs } = await import('firebase/firestore');
         const { db } = await import('@/lib/firebase');
         const snap = await getDocs(collection(db, 'batches'));
-        
-        if (!snap.empty) {
-          // Firebase has data — use it
-          const firebaseBatches = snap.docs.map(d => d.data());
-          setBatches(firebaseBatches);
-          setLoading(false);
-          return;
+        const list = snap.docs.map(d => d.data());
+        setBatches(list);
+        if (list.length === 0) {
+          setError('No courses found. Admin: go to API Management → Sync Batches to load courses.');
         }
-
-        // Firebase empty — fallback to API
-        const res  = await fetch('/api/missionjeet/batches');
-        if (!res.ok) throw new Error(`API error: ${res.status}`);
-        const json = await res.json();
-
-        // API: json.data[].list[] contains batch items
-        let raw = [];
-        if (Array.isArray(json?.data)) {
-          json.data.forEach((group) => {
-            if (Array.isArray(group?.list)) raw.push(...group.list);
-            else if (group?.id) raw.push(group);
-          });
-        } else if (Array.isArray(json)) {
-          raw = json;
-        }
-
-        setBatches(raw);
       } catch (e) {
         setError(e.message);
       } finally {

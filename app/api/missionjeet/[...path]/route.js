@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server';
 
-// Proxy route — base URL comes from Firestore apiConfig set by admin
-// Admin Panel → API Management → Base URL → saved to Firestore → used here
-
-let _baseUrl = null;
-let _baseTime = 0;
+// Proxy — base URL comes ONLY from Firestore apiConfig set by admin
+// No hardcoded fallback
 
 async function getBaseUrl() {
-  if (_baseUrl && Date.now() - _baseTime < 60000) return _baseUrl;
   try {
     const admin = require('firebase-admin');
     if (!admin.apps.length) {
@@ -23,23 +19,25 @@ async function getBaseUrl() {
     if (admin.apps.length) {
       const snap = await admin.firestore().collection('apiConfig').doc('urls').get();
       if (snap.exists && snap.data().baseUrl) {
-        _baseUrl = snap.data().baseUrl.replace(/\/$/, '');
-        _baseTime = Date.now();
-        return _baseUrl;
+        return snap.data().baseUrl.replace(/\/$/, '');
       }
     }
   } catch {}
-  // Last resort fallback — only used if admin hasn't set a URL yet
-  _baseUrl = 'https://apiserverpro.onrender.com/api/missionjeet';
-  _baseTime = Date.now();
-  return _baseUrl;
+  return null; // No URL configured
 }
 
 export async function GET(req, { params }) {
   try {
-    const path    = (await params).path.join('/');
     const baseUrl = await getBaseUrl();
-    const url     = `${baseUrl}/${path}${req.nextUrl.search}`;
+
+    if (!baseUrl) {
+      return NextResponse.json({
+        error: 'API not configured. Go to Admin Panel → API Management → set Base URL.',
+      }, { status: 503 });
+    }
+
+    const path = (await params).path.join('/');
+    const url  = `${baseUrl}/${path}${req.nextUrl.search}`;
 
     const res = await fetch(url, {
       cache: 'no-store',

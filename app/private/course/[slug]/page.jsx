@@ -89,7 +89,7 @@ export default function CoursePage({ params }) {
   useEffect(() => {
     async function load() {
       try {
-        // 1. Try Firebase first for course details
+        // 1. Try Firebase cache first
         const { getDoc, doc: fsDoc } = await import('firebase/firestore');
         const { db: fsDb } = await import('@/lib/firebase');
         const cached = await getDoc(fsDoc(fsDb, 'courses', String(courseId)));
@@ -97,14 +97,14 @@ export default function CoursePage({ params }) {
         if (cached.exists()) {
           setCourse(cached.data());
         } else {
-          // Fallback: fetch from API proxy (which uses admin-configured base URL)
+          // 2. Fetch via proxy (proxy reads base URL from admin config — no hardcoded URL)
           const detailsRes = await fetch(`/api/missionjeet/course-details?courseid=${courseId}`);
-          if (!detailsRes.ok) throw new Error(`Details API: ${detailsRes.status}`);
+          if (!detailsRes.ok) throw new Error(`Course details fetch failed: ${detailsRes.status}`);
           const json     = await detailsRes.json();
           const overview = json?.data?.find((i) => i.type === 'overview');
           const details  = overview?.data?.find((i) => i.layout_type === 'details');
           const data     = details?.layout_data?.[0];
-          if (!data) throw new Error('Course data not found');
+          if (!data) throw new Error('Course data not found in API response');
           setCourse(data);
           // Cache to Firebase
           import('firebase/firestore').then(({ setDoc, doc: d }) => {
