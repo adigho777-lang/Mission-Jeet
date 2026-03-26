@@ -12,60 +12,38 @@ export default function AchievementsSection() {
     <section className="py-16 px-6 bg-white">
       <div className="max-w-[1200px] mx-auto grid md:grid-cols-2 gap-12 items-center">
 
-        {/* LEFT IMAGE */}
+        {/* LEFT — no external image, use stats visual instead */}
         <div className="flex justify-center md:justify-start">
-          <img
-            src="https://missionjeet.in/images/Nexttopper_achivement.png"
-            alt="Achievements"
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            style={{ width: '100%', height: 'auto', maxWidth: '480px' }}
-            className="object-contain"
-          />
+          <div className="grid grid-cols-2 gap-3 max-w-[320px] w-full">
+            {stats.map((s) => (
+              <div key={s.label + '-mini'}
+                className="rounded-xl px-3 py-3 flex flex-col items-center text-center"
+                style={{ background: s.bg, border: `1px solid ${s.border}` }}
+              >
+                <div className="text-2xl mb-1">{s.icon}</div>
+                <p className="text-[18px] font-bold" style={{ color: s.color }}>{s.value}</p>
+                <p className="text-[11px] text-gray-600">{s.label}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* RIGHT CONTENT */}
         <div>
-          {/* TITLE */}
-          <h2 className="text-[26px] font-semibold text-[#1a1a1a]">
-            Our Achievements
-          </h2>
-
-          {/* DESCRIPTION */}
+          <h2 className="text-[26px] font-semibold text-[#1a1a1a]">Our Achievements</h2>
           <p className="text-[13px] text-gray-500 mt-2 leading-relaxed max-w-[420px]">
             We are proud of the milestones achieved through innovative courses and student-first dedication to providing high-quality education and learning growth.
           </p>
-
-          {/* STATS GRID */}
-          <div className="grid grid-cols-2 gap-4 mt-6">
-
+          <div className="mt-6 space-y-3">
             {stats.map((s) => (
-              <div
-                key={s.label}
-                className="rounded-xl px-4 py-4 flex flex-col items-center justify-center text-center"
-                style={{
-                  background: s.bg,
-                  border: `1px solid ${s.border}`,
-                  minHeight: '100px',
-                }}
-              >
-                {/* ICON */}
-                <div className="text-[20px] mb-1">{s.icon}</div>
-
-                {/* VALUE */}
-                <p
-                  className="text-[20px] font-bold leading-tight"
-                  style={{ color: s.color }}
-                >
-                  {s.value}
-                </p>
-
-                {/* LABEL */}
-                <p className="text-[12px] text-gray-700 mt-0.5">
-                  {s.label}
-                </p>
+              <div key={s.label} className="flex items-center gap-3">
+                <span className="text-2xl">{s.icon}</span>
+                <div>
+                  <span className="text-[18px] font-bold" style={{ color: s.color }}>{s.value}</span>
+                  <span className="text-[13px] text-gray-600 ml-2">{s.label}</span>
+                </div>
               </div>
             ))}
-
           </div>
         </div>
 
