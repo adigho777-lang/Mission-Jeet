@@ -1,14 +1,24 @@
 'use client';
 import { useState, useEffect } from 'react';
 
-// Slides loaded from Firebase batches (thumbnails from API)
-// Fallback: gradient placeholders (no broken image requests)
+const FALLBACKS = [
+  {
+    bg: 'linear-gradient(135deg, #0f3460 0%, #533483 60%, #e94560 100%)',
+    title: 'Crack JEE 2025 🚀',
+    sub: 'Expert-led courses by Mission JEET',
+  },
+  {
+    bg: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+    title: 'Crack NEET 2025 🧬',
+    sub: 'India\'s best NEET preparation platform',
+  },
+];
+
 export default function HeroCarousel() {
   const [slides, setSlides] = useState([]);
   const [cur, setCur] = useState(0);
 
   useEffect(() => {
-    // Load thumbnails from Firebase batches
     async function load() {
       try {
         const { collection, getDocs } = await import('firebase/firestore');
@@ -21,21 +31,19 @@ export default function HeroCarousel() {
     load();
   }, []);
 
-  useEffect(() => {
-    if (slides.length < 2) return;
-    const t = setInterval(() => setCur((p) => (p + 1) % slides.length), 3000);
-    return () => clearInterval(t);
-  }, [slides]);
+  const total = slides.length > 0 ? slides.length : FALLBACKS.length;
 
-  const gradients = [
-    'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
-    'linear-gradient(135deg, #0f3460 0%, #533483 50%, #e94560 100%)',
-  ];
+  useEffect(() => {
+    if (total < 2) return;
+    const t = setInterval(() => setCur(p => (p + 1) % total), 3500);
+    return () => clearInterval(t);
+  }, [total]);
 
   return (
     <section className="pt-3 pb-4 px-6">
       <div className="max-w-[1180px] mx-auto">
         <div className="relative w-full rounded-xl overflow-hidden shadow-md" style={{ height: '210px' }}>
+
           {slides.length > 0 ? (
             slides.map((src, i) => (
               <div key={i} className="absolute inset-0 transition-opacity duration-700"
@@ -45,28 +53,29 @@ export default function HeroCarousel() {
               </div>
             ))
           ) : (
-            // Fallback gradient banners when no images available
-            gradients.map((bg, i) => (
-              <div key={i} className="absolute inset-0 transition-opacity duration-700 flex items-center justify-center"
-                style={{ opacity: i === cur ? 1 : 0, zIndex: i === cur ? 1 : 0, background: bg }}>
+            FALLBACKS.map((f, i) => (
+              <div key={i} className="absolute inset-0 transition-opacity duration-700 flex items-center justify-center px-8"
+                style={{ opacity: i === cur ? 1 : 0, zIndex: i === cur ? 1 : 0, background: f.bg }}>
                 <div className="text-center text-white">
-                  <p className="text-[22px] font-bold">{i === 0 ? 'Crack NEET 2025' : 'Crack JEE 2025'}</p>
-                  <p className="text-[13px] mt-1 opacity-80">Expert-led courses by Mission JEET</p>
+                  <p className="text-[24px] md:text-[32px] font-bold">{f.title}</p>
+                  <p className="text-[13px] md:text-[15px] mt-2 opacity-80">{f.sub}</p>
+                  <div className="mt-4 inline-block bg-white/20 border border-white/30 text-white text-[12px] font-semibold px-5 py-2 rounded-full">
+                    Explore Courses →
+                  </div>
                 </div>
               </div>
             ))
           )}
 
           {/* Dots */}
-          {(slides.length > 1 || gradients.length > 1) && (
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-              {(slides.length > 0 ? slides : gradients).map((_, i) => (
-                <button key={i} onClick={() => setCur(i)} aria-label={`Slide ${i + 1}`}
-                  className="h-1.5 rounded-full transition-all duration-300"
-                  style={{ width: i === cur ? '18px' : '6px', background: i === cur ? '#ff6a00' : 'rgba(255,255,255,0.75)' }} />
-              ))}
-            </div>
-          )}
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+            {Array.from({ length: total }).map((_, i) => (
+              <button key={i} onClick={() => setCur(i)} aria-label={`Slide ${i + 1}`}
+                className="h-1.5 rounded-full transition-all duration-300"
+                style={{ width: i === cur ? '18px' : '6px', background: i === cur ? '#ff6a00' : 'rgba(255,255,255,0.6)' }} />
+            ))}
+          </div>
+
         </div>
       </div>
     </section>

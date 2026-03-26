@@ -4,8 +4,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 const fallbackCourses = [
-  { id: '151', title: 'Drona JEE class 11th', thumbnail: '' },
-  { id: '152', title: 'Drona NEET class 11th', thumbnail: '' },
+  { id: '151', title: 'JEE Batch', thumbnail: '', category: 'jee' },
+  { id: '152', title: 'NEET Batch', thumbnail: '', category: 'neet' },
 ];
 
 export default function TrendingCourses() {
@@ -59,14 +59,17 @@ export default function TrendingCourses() {
                 {/* CARD */}
                 <div
                   onClick={() => setActiveId(isActive ? null : c.id)}
-                  className="relative rounded-xl overflow-hidden cursor-pointer transition hover:scale-[1.03] flex items-center justify-center bg-gray-900"
-                  style={{ width: '160px', height: '100px', boxShadow: '0 1px 6px rgba(0,0,0,0.12)' }}
+                  className="relative rounded-xl overflow-hidden cursor-pointer transition hover:scale-[1.03] flex items-center justify-center"
+                  style={{ width: '160px', height: '100px', boxShadow: '0 1px 6px rgba(0,0,0,0.12)',
+                    background: c.thumbnail ? '#111' : (c.category === 'neet' ? 'linear-gradient(135deg,#0f3460,#533483)' : 'linear-gradient(135deg,#1a1a2e,#e94560)') }}
                 >
                   {c.thumbnail ? (
-                    <Image src={c.thumbnail} alt={c.title} fill className="object-cover"
-                      sizes="160px" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    <Image src={c.thumbnail} alt={c.title} fill className="object-cover" sizes="160px"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                   ) : (
-                    <span className="text-3xl">📚</span>
+                    <span className="text-white text-[13px] font-bold px-2 text-center">
+                      {c.category?.toUpperCase() || c.title}
+                    </span>
                   )}
                 </div>
 
