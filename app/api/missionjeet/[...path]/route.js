@@ -1,29 +1,35 @@
 import { NextResponse } from 'next/server';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
 
-// Proxy — base URL comes ONLY from Firestore apiConfig set by admin
-// No hardcoded fallback
+const firebaseConfig = {
+  apiKey: "AIzaSyArB2FOD3UgvotLVoVCr1Bz7Os4TbPZD8Y",
+  authDomain: "mission-jeet-8f2f5.firebaseapp.com",
+  projectId: "mission-jeet-8f2f5",
+  storageBucket: "mission-jeet-8f2f5.firebasestorage.app",
+  messagingSenderId: "1002047948820",
+  appId: "1:1002047948820:web:5b6d1597f230299791ff01",
+};
+
+let _baseUrl = null;
+let _baseTime = 0;
 
 async function getBaseUrl() {
+  // Cache for 60 seconds
+  if (_baseUrl && Date.now() - _baseTime < 60000) return _baseUrl;
+
   try {
-    const admin = require('firebase-admin');
-    if (!admin.apps.length) {
-      const cred = {
-        projectId: process.env.FIREBASE_PROJECT_ID || 'mission-jeet-8f2f5',
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      };
-      if (cred.clientEmail && cred.privateKey) {
-        admin.initializeApp({ credential: admin.credential.cert(cred) });
-      }
-    }
-    if (admin.apps.length) {
-      const snap = await admin.firestore().collection('apiConfig').doc('urls').get();
-      if (snap.exists && snap.data().baseUrl) {
-        return snap.data().baseUrl.replace(/\/$/, '');
-      }
+    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    const snap = await getDoc(doc(db, 'apiConfig', 'urls'));
+    if (snap.exists() && snap.data().baseUrl) {
+      _baseUrl  = snap.data().baseUrl.replace(/\/$/, '');
+      _baseTime = Date.now();
+      return _baseUrl;
     }
   } catch {}
-  return null; // No URL configured
+
+  return null;
 }
 
 export async function GET(req, { params }) {
@@ -45,12 +51,12 @@ export async function GET(req, { params }) {
     });
 
     if (!res.ok) {
-      return NextResponse.json({ error: `Upstream ${res.status}: ${url}` }, { status: res.status });
+      return NextResponse.json({ error: `Upstream ${res.status}` }, { status: res.status });
     }
 
     const text = await res.text();
     if (!text?.trim()) {
-      return NextResponse.json({ error: 'Empty response from upstream' }, { status: 502 });
+      return NextResponse.json({ error: 'Empty response' }, { status: 502 });
     }
 
     let data;

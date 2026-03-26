@@ -36,7 +36,7 @@ export async function GET(req) {
   }
 
   const admin = getAdmin();
-  if (!admin) return NextResponse.json({ error: 'Admin not configured' }, { status: 500 });
+  if (!admin) return NextResponse.json({ error: 'Admin not configured', skipped: true }, { status: 200 });
 
   const db = admin.firestore();
   const messaging = admin.messaging();

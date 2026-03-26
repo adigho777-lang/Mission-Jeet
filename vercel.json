@@ -3,11 +3,5 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "installCommand": "npm install",
-  "regions": ["bom1"],
-  "crons": [
-    {
-      "path": "/api/sync-data",
-      "schedule": "0 0 * * *"
-    }
-  ]
+  "regions": ["bom1"]
 }
