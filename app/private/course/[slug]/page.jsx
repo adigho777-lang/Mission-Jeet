@@ -89,25 +89,37 @@ export default function CoursePage({ params }) {
   useEffect(() => {
     async function load() {
       try {
-        // Course details
-        const detailsRes = await fetch(`/api/missionjeet/course-details?courseid=${courseId}`);
-        if (!detailsRes.ok) throw new Error(`Details API: ${detailsRes.status}`);
-        const json     = await detailsRes.json();
-        const overview = json?.data?.find((i) => i.type === 'overview');
-        const details  = overview?.data?.find((i) => i.layout_type === 'details');
-        const data     = details?.layout_data?.[0];
-        if (!data) throw new Error('Course data not found');
-        setCourse(data);
-        setDoc(doc(db, 'courses', String(courseId)), {
-          title: data.title ?? '', description: data.description ?? '',
-          thumbnail: data.thumbnail ?? '', mrp: data.mrp ?? 0,
-          price: data.offer_price ?? 0, updatedAt: Date.now(),
-        }).catch(() => {});
+        // 1. Try Firebase first for course details
+        const { getDoc, doc: fsDoc } = await import('firebase/firestore');
+        const { db: fsDb } = await import('@/lib/firebase');
+        const cached = await getDoc(fsDoc(fsDb, 'courses', String(courseId)));
+
+        if (cached.exists()) {
+          setCourse(cached.data());
+        } else {
+          // Fallback: fetch from API proxy (which uses admin-configured base URL)
+          const detailsRes = await fetch(`/api/missionjeet/course-details?courseid=${courseId}`);
+          if (!detailsRes.ok) throw new Error(`Details API: ${detailsRes.status}`);
+          const json     = await detailsRes.json();
+          const overview = json?.data?.find((i) => i.type === 'overview');
+          const details  = overview?.data?.find((i) => i.layout_type === 'details');
+          const data     = details?.layout_data?.[0];
+          if (!data) throw new Error('Course data not found');
+          setCourse(data);
+          // Cache to Firebase
+          import('firebase/firestore').then(({ setDoc, doc: d }) => {
+            setDoc(d(fsDb, 'courses', String(courseId)), {
+              title: data.title ?? '', description: data.description ?? '',
+              thumbnail: data.thumbnail ?? '', mrp: data.mrp ?? 0,
+              price: data.offer_price ?? 0, updatedAt: Date.now(),
+            }).catch(() => {});
+          });
+        }
 
         // Root content (check Firestore cache first)
-        const cached = await getCachedFolder(`root_${courseId}`);
-        if (cached) {
-          setRootItems(cached.map(normalise));
+        const cachedContent = await getCachedFolder(`root_${courseId}`);
+        if (cachedContent) {
+          setRootItems(cachedContent.map(normalise));
         } else {
           const contentRes = await fetch(`/api/missionjeet/all-content/${courseId}`);
           if (contentRes.ok) {

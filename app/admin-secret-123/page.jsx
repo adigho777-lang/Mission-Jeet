@@ -564,11 +564,19 @@ function NotificationsTab() {
 // ── API Management Tab ────────────────────────────────────────────────────────
 function ApiManagementTab() {
   const DEFAULT_APIS = {
-    baseUrl:        'https://apiserverpro.onrender.com/api/missionjeet',
-    batches:        'https://apiserverpro.onrender.com/api/missionjeet/batches',
-    courseDetails:  'https://apiserverpro.onrender.com/api/missionjeet/course-details',
-    allContent:     'https://apiserverpro.onrender.com/api/missionjeet/all-content',
-    contentDetails: 'https://apiserverpro.onrender.com/api/missionjeet/content-details',
+    baseUrl:        '',
+    batches:        '',
+    courseDetails:  '',
+    allContent:     '',
+    contentDetails: '',
+  };
+
+  const PLACEHOLDERS = {
+    baseUrl:        'e.g. https://yourapi.com/api/missionjeet',
+    batches:        'e.g. https://yourapi.com/api/missionjeet/batches',
+    courseDetails:  'e.g. https://yourapi.com/api/missionjeet/course-details',
+    allContent:     'e.g. https://yourapi.com/api/missionjeet/all-content',
+    contentDetails: 'e.g. https://yourapi.com/api/missionjeet/content-details',
   };
 
   const API_LABELS = {
@@ -701,7 +709,7 @@ function ApiManagementTab() {
                   className={inp + ' flex-1 font-mono text-[11px]'}
                   value={config[key] || ''}
                   onChange={e => setConfig(p => ({ ...p, [key]: e.target.value }))}
-                  placeholder={DEFAULT_APIS[key]}
+                  placeholder={PLACEHOLDERS[key] || ''}
                 />
                 <button
                   onClick={() => handleTest(key)}

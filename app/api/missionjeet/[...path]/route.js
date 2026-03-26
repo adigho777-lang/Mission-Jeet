@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 
-// Dynamic API proxy — base URL comes from Firestore apiConfig
-// Falls back to default if not configured
+// Proxy route — base URL comes from Firestore apiConfig set by admin
+// Admin Panel → API Management → Base URL → saved to Firestore → used here
+
+let _baseUrl = null;
+let _baseTime = 0;
 
 async function getBaseUrl() {
+  if (_baseUrl && Date.now() - _baseTime < 60000) return _baseUrl;
   try {
-    // Server-side: use Firebase Admin to read config
     const admin = require('firebase-admin');
     if (!admin.apps.length) {
       const cred = {
@@ -19,24 +22,32 @@ async function getBaseUrl() {
     }
     if (admin.apps.length) {
       const snap = await admin.firestore().collection('apiConfig').doc('urls').get();
-      if (snap.exists && snap.data().baseUrl) return snap.data().baseUrl;
+      if (snap.exists && snap.data().baseUrl) {
+        _baseUrl = snap.data().baseUrl.replace(/\/$/, '');
+        _baseTime = Date.now();
+        return _baseUrl;
+      }
     }
   } catch {}
-  return 'https://apiserverpro.onrender.com/api/missionjeet';
+  // Last resort fallback — only used if admin hasn't set a URL yet
+  _baseUrl = 'https://apiserverpro.onrender.com/api/missionjeet';
+  _baseTime = Date.now();
+  return _baseUrl;
 }
 
 export async function GET(req, { params }) {
   try {
-    const path = (await params).path.join('/');
+    const path    = (await params).path.join('/');
     const baseUrl = await getBaseUrl();
-    const url = `${baseUrl}/${path}${req.nextUrl.search}`;
+    const url     = `${baseUrl}/${path}${req.nextUrl.search}`;
 
-    console.log('🔥 Proxying:', url);
-
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15000),
+    });
 
     if (!res.ok) {
-      return NextResponse.json({ error: `Upstream API error: ${res.status}` }, { status: res.status });
+      return NextResponse.json({ error: `Upstream ${res.status}: ${url}` }, { status: res.status });
     }
 
     const text = await res.text();
@@ -46,13 +57,10 @@ export async function GET(req, { params }) {
 
     let data;
     try { data = JSON.parse(text); }
-    catch {
-      return NextResponse.json({ error: 'Invalid JSON from upstream', raw: text.slice(0, 500) }, { status: 502 });
-    }
+    catch { return NextResponse.json({ error: 'Invalid JSON', raw: text.slice(0, 300) }, { status: 502 }); }
 
     return NextResponse.json(data);
   } catch (err) {
-    console.error('❌ Proxy Error:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
