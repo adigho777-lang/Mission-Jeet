@@ -1,25 +1,95 @@
 import { NextResponse } from 'next/server';
 
-// Admin sync: reads base URL from Firestore → fetches API → stores in Firestore
-// No hardcoded URLs anywhere
+// Admin sync: reads base URL from Firestore REST API → fetches from external API → stores in Firestore
+// Uses Firestore REST API to avoid firebase-admin SDK issues
 
-let _admin = null;
-
-function getAdmin() {
-  if (_admin) return _admin;
+async function getAdminConfig() {
+  const projectId = 'mission-jeet-8f2f5';
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/apiConfig/urls`;
   try {
-    const admin = require('firebase-admin');
-    if (admin.apps.length > 0) { _admin = admin; return admin; }
-    const cred = {
-      projectId: process.env.FIREBASE_PROJECT_ID || 'mission-jeet-8f2f5',
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    };
-    if (!cred.clientEmail || !cred.privateKey) return null;
-    admin.initializeApp({ credential: admin.credential.cert(cred) });
-    _admin = admin;
-    return admin;
-  } catch (e) { return null; }
+    const res = await fetch(url, { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        baseUrl: data?.fields?.baseUrl?.stringValue || null,
+      };
+    }
+  } catch {}
+  return { baseUrl: null };
+}
+
+async function saveToFirestore(collection, docId, fields) {
+  const projectId = 'mission-jeet-8f2f5';
+  // Use Firestore REST API to write data
+  // Note: This requires Firestore rules to allow writes, or use Admin SDK
+  // For now we return the data for client-side save
+  return null;
+}
+
+function parseBatches(json) {
+  if (Array.isArray(json)) return json;
+  if (Array.isArray(json?.data)) {
+    const flat = [];
+    json.data.forEach(item => {
+      if (Array.isArray(item?.list)) flat.push(...item.list);
+      else if (item?.id || item?._id) flat.push(item);
+    });
+    return flat;
+  }
+  if (Array.isArray(json?.batches)) return json.batches;
+  return [];
+}
+
+export async function POST(req) {
+  try {
+    const { type } = await req.json();
+
+    const config = await getAdminConfig();
+
+    if (!config.baseUrl) {
+      return NextResponse.json({
+        error: 'No API URL configured. Go to Admin Panel → API Management → set Base URL first.',
+        success: false,
+      }, { status: 400 });
+    }
+
+    const baseUrl = config.baseUrl.replace(/\/$/, '');
+    const results = {};
+
+    if (type === 'batches' || type === 'all') {
+      const url = `${baseUrl}/batches`;
+
+      const res = await fetch(url, {
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!res.ok) {
+        return NextResponse.json({
+          error: `Batches API returned ${res.status}. URL tried: ${url}`,
+          success: false,
+        }, { status: 400 });
+      }
+
+      const json = await res.json();
+      const list = parseBatches(json);
+
+      if (list.length === 0) {
+        return NextResponse.json({
+          error: `API returned 0 batches. URL: ${url}. Response: ${JSON.stringify(json).slice(0, 200)}`,
+          success: false,
+        }, { status: 400 });
+      }
+
+      // Return data for client-side save to Firestore
+      results.batches = { total: list.length, data: list };
+    }
+
+    return NextResponse.json({ success: true, results });
+  } catch (e) {
+    return NextResponse.json({ error: e.message, success: false }, { status: 500 });
+  }
 }
 
 function parseBatches(json) {

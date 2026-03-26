@@ -1,31 +1,27 @@
 import { NextResponse } from 'next/server';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyArB2FOD3UgvotLVoVCr1Bz7Os4TbPZD8Y",
-  authDomain: "mission-jeet-8f2f5.firebaseapp.com",
-  projectId: "mission-jeet-8f2f5",
-  storageBucket: "mission-jeet-8f2f5.firebasestorage.app",
-  messagingSenderId: "1002047948820",
-  appId: "1:1002047948820:web:5b6d1597f230299791ff01",
-};
+// Proxy route — reads base URL from Firestore via REST API (no SDK needed)
+// This avoids any Firebase SDK import issues in server routes
 
 let _baseUrl = null;
 let _baseTime = 0;
 
 async function getBaseUrl() {
-  // Cache for 60 seconds
   if (_baseUrl && Date.now() - _baseTime < 60000) return _baseUrl;
 
   try {
-    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-    const db  = getFirestore(app);
-    const snap = await getDoc(doc(db, 'apiConfig', 'urls'));
-    if (snap.exists() && snap.data().baseUrl) {
-      _baseUrl  = snap.data().baseUrl.replace(/\/$/, '');
-      _baseTime = Date.now();
-      return _baseUrl;
+    // Use Firestore REST API directly — no SDK import needed
+    const projectId = 'mission-jeet-8f2f5';
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/apiConfig/urls`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      const baseUrl = data?.fields?.baseUrl?.stringValue;
+      if (baseUrl) {
+        _baseUrl  = baseUrl.replace(/\/$/, '');
+        _baseTime = Date.now();
+        return _baseUrl;
+      }
     }
   } catch {}
 
