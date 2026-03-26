@@ -594,13 +594,21 @@ function ApiManagementTab() {
     if (!baseUrl.trim()) return;
     setTesting(true); setTestResult(null);
     try {
-      const url = baseUrl.replace(/\/$/, '') + '/batches';
-      const res = await fetch(url, { cache: 'no-store' });
+      // Save first so proxy picks up the new URL, then test via proxy (avoids CORS)
+      const { setDoc, doc: fsDoc } = await import('firebase/firestore');
+      await setDoc(fsDoc(db, 'apiConfig', 'urls'), { baseUrl: baseUrl.trim() }, { merge: true });
+
+      // Test via our proxy — proxy reads baseUrl from Firestore
+      const res = await fetch('/api/missionjeet/batches', { cache: 'no-store' });
       const data = await res.json();
-      const list = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data.flatMap(i => i.list || [i]) : [];
+      if (data.error) throw new Error(data.error);
+      const list = Array.isArray(data) ? data
+        : Array.isArray(data?.data) ? data.data.flatMap(i => Array.isArray(i.list) ? i.list : [i])
+        : [];
       setTestResult({ ok: true, msg: `✅ Connected — ${list.length} batches found` });
+      setSaved(true); setTimeout(() => setSaved(false), 3000);
     } catch (e) {
-      setTestResult({ ok: false, msg: `❌ Failed: ${e.message}` });
+      setTestResult({ ok: false, msg: `❌ ${e.message}` });
     } finally { setTesting(false); }
   }
 
