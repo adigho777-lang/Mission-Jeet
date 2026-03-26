@@ -563,13 +563,154 @@ function NotificationsTab() {
 
 // ── API Management Tab ────────────────────────────────────────────────────────
 function ApiManagementTab() {
-  const DEFAULT_APIS = {
-    baseUrl:        '',
-    batches:        '',
-    courseDetails:  '',
-    allContent:     '',
-    contentDetails: '',
-  };
+  const [baseUrl,    setBaseUrl]    = useState('');
+  const [saved,      setSaved]      = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [testing,    setTesting]    = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [syncing,    setSyncing]    = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+
+  useEffect(() => {
+    getDocs(collection(db, 'apiConfig')).then(snap => {
+      const d = snap.docs.find(d => d.id === 'urls');
+      if (d?.data().baseUrl) setBaseUrl(d.data().baseUrl);
+    });
+  }, []);
+
+  async function handleSave() {
+    if (!baseUrl.trim()) return;
+    setSaving(true); setSaved(false);
+    try {
+      const { setDoc, doc: fsDoc } = await import('firebase/firestore');
+      await setDoc(fsDoc(db, 'apiConfig', 'urls'), { baseUrl: baseUrl.trim() }, { merge: true });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) { alert('Save failed: ' + e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function handleTest() {
+    if (!baseUrl.trim()) return;
+    setTesting(true); setTestResult(null);
+    try {
+      const url = baseUrl.replace(/\/$/, '') + '/batches';
+      const res = await fetch(url, { cache: 'no-store' });
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data.flatMap(i => i.list || [i]) : [];
+      setTestResult({ ok: true, msg: `✅ Connected — ${list.length} batches found` });
+    } catch (e) {
+      setTestResult({ ok: false, msg: `❌ Failed: ${e.message}` });
+    } finally { setTesting(false); }
+  }
+
+  async function handleSync() {
+    setSyncing(true); setSyncResult(null);
+    try {
+      const res = await fetch('/api/admin-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'batches' }),
+      });
+      const data = await res.json();
+
+      if (data.success && data.results?.batches?.data) {
+        const { doc: fsDoc, setDoc } = await import('firebase/firestore');
+        const list = data.results.batches.data;
+        let saved = 0;
+        for (const item of list) {
+          const id = String(item.id || item._id || item.batch_id || '');
+          if (!id) continue;
+          const titleLower = (item.title || '').toLowerCase();
+          let category = (item.category || '').toLowerCase();
+          if (!category) {
+            if (titleLower.includes('neet')) category = 'neet';
+            else if (titleLower.includes('jee')) category = 'jee';
+          }
+          await setDoc(fsDoc(db, 'batches', id), {
+            id, title: item.title || item.name || '', category,
+            thumbnail: item.thumbnail || item.image || '',
+            price: Number(item.price || 0),
+            finalPrice: Number(item.finalPrice || item.offer_price || item.price || 0),
+            description: item.description || '', slug: item.slug || id,
+            updatedAt: new Date(),
+          }, { merge: true });
+          saved++;
+        }
+        setSyncResult({ ok: true, msg: `✅ Synced ${saved} batches to Firebase` });
+      } else if (data.error) {
+        setSyncResult({ ok: false, msg: `❌ ${data.error}` });
+      } else {
+        setSyncResult({ ok: true, msg: `✅ Sync complete` });
+      }
+    } catch (e) {
+      setSyncResult({ ok: false, msg: `❌ ${e.message}` });
+    } finally { setSyncing(false); }
+  }
+
+  return (
+    <div className="space-y-5">
+
+      {/* Base URL input */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <h2 className="text-[14px] font-bold mb-1">🔌 API Base URL</h2>
+        <p className="text-[12px] text-gray-500 mb-4">
+          Enter your API base URL. All endpoints are appended automatically.
+        </p>
+
+        <div className="flex gap-2 mb-2">
+          <input
+            className={inp + ' flex-1 font-mono text-[12px]'}
+            value={baseUrl}
+            onChange={e => setBaseUrl(e.target.value)}
+            placeholder="https://yourapi.com/api/missionjeet"
+          />
+          <button onClick={handleTest} disabled={testing || !baseUrl.trim()}
+            className="shrink-0 px-4 py-2 text-[12px] border border-gray-200 rounded-lg hover:border-black disabled:opacity-40 transition-colors">
+            {testing ? 'Testing...' : 'Test'}
+          </button>
+        </div>
+
+        {testResult && (
+          <p className={`text-[12px] mb-3 ${testResult.ok ? 'text-green-600' : 'text-red-500'}`}>{testResult.msg}</p>
+        )}
+
+        <button onClick={handleSave} disabled={saving || !baseUrl.trim()}
+          className="bg-black text-white text-[13px] font-semibold px-6 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
+          {saving ? 'Saving...' : saved ? '✅ Saved!' : 'Save'}
+        </button>
+      </div>
+
+      {/* Endpoints reference */}
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
+        <h3 className="text-[13px] font-semibold mb-3">Endpoints used (auto-appended to Base URL):</h3>
+        <div className="space-y-1 font-mono text-[11px] text-gray-600">
+          <p><span className="text-blue-600">/batches</span> — course list</p>
+          <p><span className="text-blue-600">/course-details?courseid=&#123;id&#125;</span> — course info</p>
+          <p><span className="text-blue-600">/all-content/&#123;courseId&#125;</span> — videos &amp; folders</p>
+          <p><span className="text-blue-600">/all-content/&#123;courseId&#125;?id=&#123;folderId&#125;</span> — folder contents</p>
+          <p><span className="text-blue-600">/content-details?content_id=&amp;course_id=</span> — video URL</p>
+        </div>
+      </div>
+
+      {/* Sync */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <h2 className="text-[14px] font-bold mb-1">🔄 Sync to Firebase</h2>
+        <p className="text-[12px] text-gray-500 mb-4">
+          Fetch latest batches from API and store in Firebase. Website reads from Firebase.
+        </p>
+        <button onClick={handleSync} disabled={syncing}
+          className="bg-blue-500 text-white text-[13px] font-semibold px-6 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors">
+          {syncing ? 'Syncing...' : '🔄 Sync Batches → Firebase'}
+        </button>
+        {syncResult && (
+          <p className={`text-[12px] mt-3 ${syncResult.ok ? 'text-green-600' : 'text-red-500'}`}>{syncResult.msg}</p>
+        )}
+      </div>
+
+    </div>
+  );
+}
 
   const PLACEHOLDERS = {
     baseUrl:        'e.g. https://yourapi.com/api/missionjeet',
