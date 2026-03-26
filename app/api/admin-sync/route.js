@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
 
-// Admin-triggered sync: fetches from configured APIs → stores in Firestore
-// Called from admin panel when admin clicks "Sync Now"
+// Admin-triggered sync: API → Firebase
+// Uses baseUrl from Firestore apiConfig, falls back to default
 
-let adminApp = null;
+let _admin = null;
 
 function getAdmin() {
-  if (adminApp) return adminApp;
+  if (_admin) return _admin;
   try {
     const admin = require('firebase-admin');
-    if (admin.apps.length > 0) { adminApp = admin; return admin; }
+    if (admin.apps.length > 0) { _admin = admin; return admin; }
     const cred = {
       projectId: process.env.FIREBASE_PROJECT_ID || 'mission-jeet-8f2f5',
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
@@ -17,69 +17,139 @@ function getAdmin() {
     };
     if (!cred.clientEmail || !cred.privateKey) return null;
     admin.initializeApp({ credential: admin.credential.cert(cred) });
-    adminApp = admin;
+    _admin = admin;
     return admin;
   } catch (e) { console.error('Admin init failed:', e); return null; }
 }
 
+// Parse batches from any API response format
+function parseBatches(json) {
+  // Format 1: flat array
+  if (Array.isArray(json)) return json;
+  // Format 2: { data: [...] }
+  if (Array.isArray(json?.data)) {
+    const flat = [];
+    json.data.forEach(item => {
+      // Format 2a: { data: [ { list: [...] } ] }
+      if (Array.isArray(item?.list)) flat.push(...item.list);
+      // Format 2b: { data: [ { id, title, ... } ] }
+      else if (item?.id || item?._id) flat.push(item);
+    });
+    return flat;
+  }
+  // Format 3: { batches: [...] }
+  if (Array.isArray(json?.batches)) return json.batches;
+  return [];
+}
+
 export async function POST(req) {
   try {
-    const { type } = await req.json(); // type: 'batches' | 'all'
+    const { type } = await req.json();
 
     const admin = getAdmin();
-    const db = admin ? admin.firestore() : null;
+    const db = admin?.firestore();
 
-    // Get API config from Firestore
-    let apiConfig = {};
+    // Read base URL from Firestore config
+    let baseUrl = 'https://apiserverpro.onrender.com/api/missionjeet';
     if (db) {
-      const configSnap = await db.collection('apiConfig').doc('urls').get();
-      if (configSnap.exists) apiConfig = configSnap.data();
+      try {
+        const snap = await db.collection('apiConfig').doc('urls').get();
+        if (snap.exists && snap.data().baseUrl) baseUrl = snap.data().baseUrl;
+      } catch {}
     }
 
-    const APIS = {
-      batches:        apiConfig.batches        || 'https://apiserverpro.onrender.com/api/missionjeet/batches',
-      courseDetails:  apiConfig.courseDetails  || 'https://apiserverpro.onrender.com/api/missionjeet/course-details',
-      allContent:     apiConfig.allContent     || 'https://apiserverpro.onrender.com/api/missionjeet/all-content',
-      contentDetails: apiConfig.contentDetails || 'https://apiserverpro.onrender.com/api/missionjeet/content-details',
-    };
+    // Strip trailing slash
+    baseUrl = baseUrl.replace(/\/$/, '');
 
     const results = {};
 
-    // Sync batches
+    // ── Sync Batches ──────────────────────────────────────────────────────────
     if (type === 'batches' || type === 'all') {
-      const res = await fetch(APIS.batches, { cache: 'no-store' });
-      const batches = await res.json();
-      const list = Array.isArray(batches) ? batches : batches?.data || [];
+      const url = `${baseUrl}/batches`;
+      console.log('Fetching batches from:', url);
+
+      const res = await fetch(url, {
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!res.ok) {
+        return NextResponse.json({
+          error: `Batches API returned ${res.status}. URL: ${url}`,
+          success: false,
+        }, { status: 400 });
+      }
+
+      const json = await res.json();
+      const list = parseBatches(json);
+
+      if (list.length === 0) {
+        return NextResponse.json({
+          error: `API returned 0 batches. Check URL: ${url}. Response: ${JSON.stringify(json).slice(0, 200)}`,
+          success: false,
+        }, { status: 400 });
+      }
 
       if (db) {
         let updated = 0, added = 0;
-        for (const batch of list) {
-          const id = String(batch.id || batch._id);
-          const ref = db.collection('courses').doc(id);
+        const batch = db.batch();
+
+        for (const item of list) {
+          const id = String(item.id || item._id || item.batch_id || '');
+          if (!id) continue;
+
+          const ref = db.collection('batches').doc(id);
           const existing = await ref.get();
+
+          // Detect category from title if not set
+          const titleLower = (item.title || '').toLowerCase();
+          let category = (item.category || item.classType || '').toLowerCase();
+          if (!category) {
+            if (titleLower.includes('neet')) category = 'neet';
+            else if (titleLower.includes('jee')) category = 'jee';
+          }
+
           const data = {
             id,
-            title: batch.title || '',
-            category: (batch.category || '').toLowerCase(),
-            thumbnail: batch.thumbnail || batch.image || '',
-            price: Number(batch.price || 0),
-            finalPrice: Number(batch.finalPrice || batch.offer_price || batch.price || 0),
-            description: batch.description || '',
-            slug: batch.slug || id,
+            title: item.title || item.name || '',
+            category,
+            thumbnail: item.thumbnail || item.image || item.banner || '',
+            price: Number(item.price || item.mrp || 0),
+            finalPrice: Number(item.finalPrice || item.offer_price || item.discounted_price || item.price || 0),
+            description: item.description || item.about || '',
+            slug: item.slug || id,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           };
-          if (existing.exists) { await ref.update(data); updated++; }
-          else { await ref.set({ ...data, createdAt: admin.firestore.FieldValue.serverTimestamp() }); added++; }
+
+          if (existing.exists) {
+            batch.update(ref, data);
+            updated++;
+          } else {
+            batch.set(ref, { ...data, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+            added++;
+          }
         }
-        results.batches = { total: list.length, updated, added };
+
+        await batch.commit();
+        results.batches = { total: list.length, updated, added, url };
       } else {
-        results.batches = { total: list.length, note: 'Admin SDK not configured, data not saved to Firestore' };
+        // No Admin SDK — return data for client-side save
+        results.batches = {
+          total: list.length,
+          data: list,
+          note: 'Admin SDK not configured — use client-side save',
+          url,
+        };
       }
     }
 
     return NextResponse.json({ success: true, results });
   } catch (e) {
     console.error('Sync error:', e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return NextResponse.json({
+      error: e.message,
+      success: false,
+    }, { status: 500 });
   }
 }

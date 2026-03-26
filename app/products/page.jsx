@@ -29,7 +29,7 @@ function ProductsContent() {
         // Read from Firebase first (API → Firebase → Website)
         const { collection, getDocs } = await import('firebase/firestore');
         const { db } = await import('@/lib/firebase');
-        const snap = await getDocs(collection(db, 'courses'));
+        const snap = await getDocs(collection(db, 'batches'));
         
         if (!snap.empty) {
           // Firebase has data — use it

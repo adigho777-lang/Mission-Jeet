@@ -21,28 +21,45 @@ export default function TrendingCourses() {
   const [activeId, setActiveId] = useState(null);
 
   useEffect(() => {
-    fetch('/api/missionjeet/batches')
-      .then((r) => r.json())
-      .then((json) => {
-        const raw = Array.isArray(json) ? json : json?.data ?? [];
+    async function load() {
+      try {
+        // Try Firebase first
+        const { collection, getDocs } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        const snap = await getDocs(collection(db, 'batches'));
 
-        const list = raw
-          .flatMap((item) =>
-            Array.isArray(item?.list) ? item.list : [item]
-          )
-          .filter((c) => c?.thumbnail || c?.image);
+        if (!snap.empty) {
+          const list = snap.docs.map(d => d.data()).filter(c => c.thumbnail);
+          if (list.length >= 1) {
+            setCourses(list.slice(0, 2).map(c => ({
+              id: c.id,
+              title: c.title,
+              thumbnail: c.thumbnail,
+            })));
+            return;
+          }
+        }
+      } catch {}
 
-        if (list.length >= 2) {
-          setCourses(
-            list.slice(0, 2).map((c) => ({
+      // Fallback: API
+      fetch('/api/missionjeet/batches')
+        .then((r) => r.json())
+        .then((json) => {
+          const raw = Array.isArray(json) ? json : json?.data ?? [];
+          const list = raw
+            .flatMap((item) => Array.isArray(item?.list) ? item.list : [item])
+            .filter((c) => c?.thumbnail || c?.image);
+          if (list.length >= 1) {
+            setCourses(list.slice(0, 2).map((c) => ({
               id: c.id || c._id,
               title: c.title || c.name,
               thumbnail: c.thumbnail || c.image,
-            }))
-          );
-        }
-      })
-      .catch(() => {});
+            })));
+          }
+        })
+        .catch(() => {});
+    }
+    load();
   }, []);
 
   // 🔥 SLUG GENERATOR

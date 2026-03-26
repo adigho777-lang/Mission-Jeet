@@ -632,9 +632,40 @@ function ApiManagementTab() {
         body: JSON.stringify({ type }),
       });
       const data = await res.json();
-      setSyncResult(data);
+
+      // If Admin SDK not configured, save client-side via Firestore directly
+      if (data.success && data.results?.batches?.data) {
+        const { collection, doc: fsDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+        const list = data.results.batches.data;
+        let saved = 0;
+        for (const item of list) {
+          const id = String(item.id || item._id || item.batch_id || '');
+          if (!id) continue;
+          const titleLower = (item.title || '').toLowerCase();
+          let category = (item.category || '').toLowerCase();
+          if (!category) {
+            if (titleLower.includes('neet')) category = 'neet';
+            else if (titleLower.includes('jee')) category = 'jee';
+          }
+          await setDoc(fsDoc(db, 'batches', id), {
+            id,
+            title: item.title || item.name || '',
+            category,
+            thumbnail: item.thumbnail || item.image || '',
+            price: Number(item.price || 0),
+            finalPrice: Number(item.finalPrice || item.offer_price || item.price || 0),
+            description: item.description || '',
+            slug: item.slug || id,
+            updatedAt: new Date(),
+          }, { merge: true });
+          saved++;
+        }
+        setSyncResult({ success: true, results: { batches: { total: list.length, saved, note: 'Saved via client' } } });
+      } else {
+        setSyncResult(data);
+      }
     } catch (e) {
-      setSyncResult({ error: e.message });
+      setSyncResult({ error: `Network error: ${e.message}. Check if the API URL is correct and accessible.` });
     } finally {
       setSyncing(false);
     }
