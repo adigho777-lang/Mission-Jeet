@@ -1,3 +1,5 @@
+'use client';
+
 const stats = [
   { value: '20+',  label: 'Instructors', bg: '#fef9c3', border: '#fde68a', color: '#92400e', icon: '👨‍🏫' },
   { value: '20K+', label: 'Videos',      bg: '#e0f2fe', border: '#bae6fd', color: '#1d4ed8', icon: '🎥' },

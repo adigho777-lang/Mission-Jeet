@@ -1,5 +1,3 @@
-export const dynamic = 'force-dynamic';
-
 import HeroCarousel from './components/HeroCarousel';
 import StrugglingSection from './components/StrugglingSection';
 import TrendingCourses from './components/TrendingCourses';
